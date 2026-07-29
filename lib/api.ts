@@ -120,3 +120,58 @@ export type RiderRent = {
 export function getMyRent(token: string) {
   return apiFetch<RiderRent>('/api/rider/me/rent', { token });
 }
+
+// ---- Payment claims ----
+
+export type PaymentClaim = {
+  id: string;
+  amount: number;
+  utr: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reject_reason: string | null;
+  date: string;
+};
+
+export function getMyClaims(token: string) {
+  return apiFetch<{ claims: PaymentClaim[] }>('/api/rider/me/payment-claims', { token });
+}
+
+export function submitPaymentClaim(token: string, body: { amount: number; utr?: string | null; screenshot_key: string }) {
+  return apiFetch<{ ok: boolean; claim_id: string }>('/api/rider/me/payment-claims', {
+    method: 'POST',
+    body,
+    token,
+  });
+}
+
+/** Upload the payment screenshot; returns the S3 key to attach to the claim. */
+export async function uploadScreenshot(token: string, uri: string): Promise<{ key: string }> {
+  const form = new FormData();
+  if (uri.startsWith('data:') || uri.startsWith('blob:')) {
+    // Web (Expo web preview): picker returns a blob/data URI.
+    const blob = await (await fetch(uri)).blob();
+    form.append('file', blob, 'proof.jpg');
+  } else {
+    // Native: React Native FormData file descriptor.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    form.append('file', { uri, name: 'proof.jpg', type: 'image/jpeg' } as any);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000); // photo over 2G needs headroom
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/rider/me/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(data?.error ?? 'Upload failed', res.status, data?.code);
+    return data as { key: string };
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError('Upload failed — check your internet', 0);
+  } finally {
+    clearTimeout(timer);
+  }
+}

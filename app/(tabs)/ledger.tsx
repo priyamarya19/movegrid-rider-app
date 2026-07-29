@@ -4,7 +4,7 @@ import { FlatList, Pressable, RefreshControl, Text, View, StyleSheet } from 'rea
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/QueryStates';
 import { colors, radius, space } from '@/constants/theme';
-import { getMyRent, type RiderRent } from '@/lib/api';
+import { getMyClaims, getMyRent, type PaymentClaim, type RiderRent } from '@/lib/api';
 import { formatDate, formatINR } from '@/lib/format';
 import { useApiQuery } from '@/lib/useApiQuery';
 
@@ -12,13 +12,22 @@ import { useApiQuery } from '@/lib/useApiQuery';
 // view (Weeks), mirroring the dashboard's rent cycle exactly.
 export default function LedgerScreen() {
   const fetcher = useCallback((t: string) => getMyRent(t), []);
+  const claimsFetcher = useCallback((t: string) => getMyClaims(t), []);
   const { data, loading, refreshing, error, refetch } = useApiQuery<RiderRent>(fetcher, [], { cacheKey: 'me:rent' });
+  const claimsQ = useApiQuery<{ claims: PaymentClaim[] }>(claimsFetcher, [], { cacheKey: 'me:claims' });
   const [tab, setTab] = useState<'payments' | 'weeks'>('payments');
 
   if (loading) return <LoadingState label="खाता लोड हो रहा है…" />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   const payments = data?.payments ?? [];
+  // Claims still in play (pending) or recently rejected sit ABOVE the confirmed
+  // ledger, so the rider always sees where their submission stands.
+  const openClaims = (claimsQ.data?.claims ?? []).filter((c) => c.status !== 'approved').slice(0, 5);
+  const refetchAll = () => {
+    refetch();
+    claimsQ.refetch();
+  };
   const weeks = [...(data?.weeks ?? [])].reverse();
 
   const statusChip = (s: string) =>
@@ -50,12 +59,33 @@ export default function LedgerScreen() {
           data={payments}
           keyExtractor={(_, i) => String(i)}
           contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={colors.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetchAll} tintColor={colors.accent} />}
           ListHeaderComponent={
-            <Card style={styles.totalCard}>
-              <Text style={styles.totalLabel}>कुल जमा · Total paid</Text>
-              <Text style={styles.totalValue}>{formatINR(Math.round(data?.total_paid ?? 0))}</Text>
-            </Card>
+            <View>
+              <Card style={styles.totalCard}>
+                <Text style={styles.totalLabel}>कुल जमा · Total paid</Text>
+                <Text style={styles.totalValue}>{formatINR(Math.round(data?.total_paid ?? 0))}</Text>
+              </Card>
+              {openClaims.map((c) => (
+                <View key={c.id} style={[styles.payRow, c.status === 'rejected' && styles.rejectedRow]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.payAmount}>{formatINR(c.amount)}</Text>
+                    <Text style={styles.payMeta}>
+                      {formatDate(c.date)}
+                      {c.utr ? ` · ${c.utr}` : ''}
+                    </Text>
+                    {c.status === 'rejected' && c.reject_reason ? (
+                      <Text style={styles.rejectReason}>❌ {c.reject_reason}</Text>
+                    ) : null}
+                  </View>
+                  <View style={[styles.chip, { backgroundColor: c.status === 'pending' ? colors.accentSoft : colors.dangerSoft }]}>
+                    <Text style={[styles.chipText, { color: c.status === 'pending' ? colors.accent : colors.danger }]}>
+                      {c.status === 'pending' ? 'Review में' : 'Reject हुआ'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           }
           ListEmptyComponent={<EmptyState icon="inbox" message="अभी कोई payment नहीं।" />}
           renderItem={({ item }) => (
@@ -143,6 +173,8 @@ const styles = StyleSheet.create({
   payPeriod: { fontSize: 11.5, color: colors.textFaint, marginTop: 1 },
   received: { color: colors.good, fontSize: 16, fontWeight: '800' },
   weekTitle: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  rejectedRow: { borderColor: 'rgba(192,57,43,0.3)' },
+  rejectReason: { fontSize: 11.5, color: colors.danger, marginTop: 2 },
   chip: { borderRadius: radius.full, paddingHorizontal: space(2.5), paddingVertical: space(1) },
   chipText: { fontSize: 11, fontWeight: '800' },
 });

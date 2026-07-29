@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '@/components/ui/Card';
 import { ErrorState, LoadingState } from '@/components/ui/QueryStates';
 import { colors, radius, space } from '@/constants/theme';
-import { getMe, getMyRent, type RiderMe, type RiderRent } from '@/lib/api';
+import { getMe, getMyClaims, getMyRent, type PaymentClaim, type RiderMe, type RiderRent } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatDate, formatINR } from '@/lib/format';
 import { useApiQuery } from '@/lib/useApiQuery';
@@ -14,19 +15,25 @@ import { useApiQuery } from '@/lib/useApiQuery';
 // and one button to pay (Pay lands in Week 2 with payment claims).
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const meFetcher = useCallback((t: string) => getMe(t), []);
   const rentFetcher = useCallback((t: string) => getMyRent(t), []);
+  const claimsFetcher = useCallback((t: string) => getMyClaims(t), []);
   const me = useApiQuery<RiderMe>(meFetcher, [], { cacheKey: 'me' });
   const rent = useApiQuery<RiderRent>(rentFetcher, [], { cacheKey: 'me:rent' });
+  const claims = useApiQuery<{ claims: PaymentClaim[] }>(claimsFetcher, [], { cacheKey: 'me:claims' });
 
   const loading = me.loading || rent.loading;
   const error = me.error ?? rent.error;
   const r = rent.data;
   const owes = (r?.outstanding_now ?? 0) > 0;
+  const pendingClaims = (claims.data?.claims ?? []).filter((c) => c.status === 'pending');
+  const pendingClaimTotal = pendingClaims.reduce((s, c) => s + c.amount, 0);
 
   const refetchAll = () => {
     me.refetch();
     rent.refetch();
+    claims.refetch();
   };
 
   return (
@@ -65,9 +72,25 @@ export default function HomeScreen() {
                 )}
               </Card>
 
+              {pendingClaims.length > 0 ? (
+                <Card style={styles.reviewCard}>
+                  <Text style={styles.reviewText}>
+                    ⏳ {formatINR(pendingClaimTotal)} ka payment review mein hai — verify hone par yahan adjust ho jayega.
+                  </Text>
+                </Card>
+              ) : null}
+
               <Pressable
                 style={styles.payBtn}
-                onPress={() => Alert.alert('जल्द आ रहा है', 'UPI se payment + screenshot upload agle update mein aayega. Tab tak apne hub incharge ko payment dein.')}>
+                onPress={() =>
+                  router.push({
+                    pathname: '/pay',
+                    params: {
+                      amount: owes ? String(r.outstanding_now) : '',
+                      dailyRate: r.daily_rent != null ? String(r.daily_rent) : '',
+                    },
+                  })
+                }>
                 <Text style={styles.payBtnText}>अभी भुगतान करें · Pay now</Text>
               </Pressable>
 
@@ -125,6 +148,8 @@ const styles = StyleSheet.create({
   heroAmount: { fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
   heroSub: { fontSize: 12.5, color: colors.textMuted },
   payBtn: { backgroundColor: colors.accent, borderRadius: radius.lg, paddingVertical: space(3.5), alignItems: 'center' },
+  reviewCard: { backgroundColor: colors.accentSoft, borderWidth: 0 },
+  reviewText: { fontSize: 12.5, color: colors.accent, fontWeight: '600', lineHeight: 18 },
   payBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: space(2), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowLabel: { color: colors.textMuted, fontSize: 13.5 },
