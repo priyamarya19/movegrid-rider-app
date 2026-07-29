@@ -91,7 +91,19 @@ export type RiderMe = {
   hub: { name: string; city: string | null } | null;
   vehicle: { ev_number: string; model: string | null; assigned_date: string; allotment_code: string | null } | null;
   kyc: { submitted: boolean; docs_verified: boolean; vehicle_pref: 'low_speed' | 'high_speed' | null };
+  documents: {
+    pan: { on_file: boolean; verified: boolean };
+    dl: { on_file: boolean; verified: boolean };
+  };
 };
+
+/** Add or replace PAN / DL after KYC (each needs number + photo together). */
+export function updateDocuments(
+  token: string,
+  body: { pan?: string; pan_key?: string; dl_number?: string; dl_front_key?: string; dl_back_key?: string }
+) {
+  return apiFetch<{ ok: boolean }>('/api/rider/me/documents', { method: 'PATCH', body, token });
+}
 
 export type KycSubmission = {
   name: string;

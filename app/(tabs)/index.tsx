@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -113,6 +113,8 @@ export default function HomeScreen() {
                   ) : null}
                 </Card>
               ) : null}
+
+              <DocumentsRow me={me.data} onPress={() => router.push('/documents' as Href)} />
             </>
           ) : (
             <OnboardingTracker me={me.data} onStartKyc={() => router.push('/kyc')} />
@@ -120,6 +122,30 @@ export default function HomeScreen() {
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+// PAN / DL status + the upgrade path to high-speed. डॉक्युमेंट state comes live
+// from the server: on-file → verified by the team → high-speed gate opens.
+function DocumentsRow({ me, onPress }: { me: RiderMe | null; onPress: () => void }) {
+  const d = me?.documents;
+  if (!d) return null;
+  const badge = (x: { on_file: boolean; verified: boolean }) =>
+    x.verified ? '✓' : x.on_file ? 'verify baaki' : '✗';
+  const allVerified = d.pan.verified && d.dl.verified;
+  return (
+    <Pressable onPress={onPress}>
+      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
+        <Text style={{ fontSize: 18 }}>📄</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.docRowTitle}>Documents · PAN {badge(d.pan)} · DL {badge(d.dl)}</Text>
+          <Text style={styles.docRowSub}>
+            {allVerified ? 'High-speed गाड़ी ke liye ready ✓' : 'High-speed गाड़ी ke liye PAN + DL upload karein'}
+          </Text>
+        </View>
+        <Text style={{ color: colors.accent, fontWeight: '800' }}>→</Text>
+      </Card>
+    </Pressable>
   );
 }
 
@@ -220,4 +246,6 @@ const styles = StyleSheet.create({
   trackDotText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   trackTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text },
   trackSub: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
+  docRowTitle: { fontSize: 13.5, fontWeight: '700', color: colors.text },
+  docRowSub: { fontSize: 11.5, color: colors.textMuted, marginTop: 1 },
 });
