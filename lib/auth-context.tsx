@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './storage';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 import * as api from './api';
@@ -15,6 +15,8 @@ type AuthState = {
   isLoading: boolean;
   sessionExpired: boolean;
   signIn: (mobile: string, otp: string) => Promise<void>;
+  /** Complete login with an already-issued rider token (UAT tester picker). */
+  signInWithToken: (token: string, user: RiderUser) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -31,8 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const [savedToken, savedUser] = await Promise.all([
-          SecureStore.getItemAsync(TOKEN_KEY),
-          SecureStore.getItemAsync(USER_KEY),
+          storage.get(TOKEN_KEY),
+          storage.get(USER_KEY),
         ]);
         if (savedToken) {
           setToken(savedToken);
@@ -44,24 +46,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const signIn = async (mobile: string, otp: string) => {
-    const res = await api.verifyOtp(mobile, otp);
-    const nextUser: RiderUser = { name: res.name, mobile };
-    await Promise.all([
-      SecureStore.setItemAsync(TOKEN_KEY, res.token),
-      SecureStore.setItemAsync(USER_KEY, JSON.stringify(nextUser)),
-    ]);
+  const complete = async (newToken: string, nextUser: RiderUser) => {
+    await Promise.all([storage.set(TOKEN_KEY, newToken), storage.set(USER_KEY, JSON.stringify(nextUser))]);
+    clearQueryCache(); // never show the previous rider's cached data
     signingOut.current = false;
     setSessionExpired(false);
-    setToken(res.token);
+    setToken(newToken);
     setUser(nextUser);
+  };
+
+  const signIn = async (mobile: string, otp: string) => {
+    const res = await api.verifyOtp(mobile, otp);
+    await complete(res.token, { name: res.name, mobile });
+  };
+
+  const signInWithToken = async (newToken: string, nextUser: RiderUser) => {
+    await complete(newToken, nextUser);
   };
 
   const signOut = async () => {
     if (signingOut.current) return;
     signingOut.current = true;
     try {
-      await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(USER_KEY)]);
+      await Promise.all([storage.del(TOKEN_KEY), storage.del(USER_KEY)]);
       clearQueryCache();
       setToken(null);
       setUser(null);
@@ -80,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, user, isLoading, sessionExpired, signIn, signOut }}>
+    <AuthContext.Provider value={{ token, user, isLoading, sessionExpired, signIn, signInWithToken, signOut }}>
       {children}
     </AuthContext.Provider>
   );

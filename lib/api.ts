@@ -59,9 +59,25 @@ export function requestOtp(mobile: string) {
 }
 
 export function verifyOtp(mobile: string, otp: string) {
-  return apiFetch<{ ok: boolean; token: string; name: string }>('/api/rider-auth/verify', {
+  return apiFetch<{ ok: boolean; token: string; name: string; tester?: boolean }>('/api/rider-auth/verify', {
     method: 'POST',
     body: { mobile, otp },
+  });
+}
+
+// ---- UAT tester mode (server 404s these on production) ----
+
+export type TestRider = { id: string; name: string; rider_code: string | null; mobile: string; ev_number: string | null };
+
+export function getTestRiders(testerToken: string) {
+  return apiFetch<{ riders: TestRider[] }>('/api/rider-auth/test-riders', { token: testerToken });
+}
+
+export function testLoginAs(testerToken: string, riderId: string) {
+  return apiFetch<{ ok: boolean; token: string; name: string }>('/api/rider-auth/test-login', {
+    method: 'POST',
+    body: { rider_id: riderId },
+    token: testerToken,
   });
 }
 

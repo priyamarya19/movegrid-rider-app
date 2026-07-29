@@ -4,19 +4,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
 import { colors, radius, space } from '@/constants/theme';
-import { requestOtp } from '@/lib/api';
+import { getTestRiders, requestOtp, testLoginAs, verifyOtp, type TestRider } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 // Two-step login: registered mobile → 6-digit OTP. Hindi-first copy with
 // English inline, matching the rider base.
 export default function LoginScreen() {
-  const { signIn, sessionExpired } = useAuth();
-  const [step, setStep] = useState<'mobile' | 'otp'>('mobile');
+  const { signIn, signInWithToken, sessionExpired } = useAuth();
+  const [step, setStep] = useState<'mobile' | 'otp' | 'pick'>('mobile');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [channel, setChannel] = useState<string | null>(null);
+  // UAT tester mode: verify(9999999999, 0000) returns a tester token and the
+  // rider picker opens; production never issues one.
+  const [testerToken, setTesterToken] = useState<string | null>(null);
+  const [riders, setRiders] = useState<TestRider[]>([]);
+  const [riderSearch, setRiderSearch] = useState('');
 
   const mobileOk = mobile.replace(/\D/g, '').length === 10;
 
@@ -36,17 +41,44 @@ export default function LoginScreen() {
   };
 
   const submitOtp = async () => {
-    if (otp.trim().length !== 6 || busy) return;
+    if (otp.trim().length < 4 || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await signIn(mobile, otp.trim());
+      const res = await verifyOtp(mobile, otp.trim());
+      if (res.tester) {
+        const list = await getTestRiders(res.token);
+        setTesterToken(res.token);
+        setRiders(list.riders);
+        setStep('pick');
+        setBusy(false);
+        return;
+      }
+      await signInWithToken(res.token, { name: res.name, mobile });
       // AuthGate redirects to home.
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
       setBusy(false);
     }
   };
+
+  const pickRider = async (r: TestRider) => {
+    if (!testerToken || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await testLoginAs(testerToken, r.id);
+      await signInWithToken(res.token, { name: res.name, mobile: r.mobile });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not open this rider');
+      setBusy(false);
+    }
+  };
+
+  const filteredRiders = riders.filter((r) => {
+    const q = riderSearch.trim().toLowerCase();
+    return !q || r.name.toLowerCase().includes(q) || (r.rider_code ?? '').toLowerCase().includes(q) || r.mobile.includes(q);
+  });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -77,11 +109,11 @@ export default function LoginScreen() {
               <Button title="OTP भेजें · Send OTP" onPress={sendOtp} loading={busy} disabled={!mobileOk || busy} />
               <Text style={styles.hint}>वही नंबर डालें जो MoveGrid में रजिस्टर्ड है</Text>
             </View>
-          ) : (
+          ) : step === 'otp' ? (
             <View style={styles.card}>
-              <Text style={styles.label}>6 अंकों का OTP डालें</Text>
+              <Text style={styles.label}>OTP डालें</Text>
               <Text style={styles.sub}>
-                {channel === 'dev' ? 'अपने hub incharge se code lein' : `+91 ${mobile} par bheja gaya`}
+                {channel === 'dev' || channel === 'test' ? 'अपने hub incharge se code lein' : `+91 ${mobile} par bheja gaya`}
               </Text>
               <TextInput
                 value={otp}
@@ -94,10 +126,41 @@ export default function LoginScreen() {
                 autoFocus
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              <Button title="लॉगिन करें · Login" onPress={submitOtp} loading={busy} disabled={otp.trim().length !== 6 || busy} />
+              <Button title="लॉगिन करें · Login" onPress={submitOtp} loading={busy} disabled={otp.trim().length < 4 || busy} />
               <Pressable onPress={() => { setStep('mobile'); setOtp(''); setError(null); }}>
                 <Text style={styles.link}>नंबर बदलें · Change number</Text>
               </Pressable>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.label}>🧪 Tester mode — किस rider की app देखनी है?</Text>
+              <TextInput
+                value={riderSearch}
+                onChangeText={setRiderSearch}
+                placeholder="Search name / code / mobile"
+                placeholderTextColor={colors.textFaint}
+                style={styles.input}
+              />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.riderList}>
+                {filteredRiders.slice(0, 30).map((r, i) => (
+                  <Pressable
+                    key={r.id}
+                    disabled={busy}
+                    onPress={() => pickRider(r)}
+                    style={({ pressed }) => [styles.riderRow, i > 0 && styles.riderRowBorder, pressed && { opacity: 0.6 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.riderName}>{r.name}</Text>
+                      <Text style={styles.riderMeta}>
+                        {r.rider_code ?? '—'} · {r.mobile}
+                        {r.ev_number ? ` · ${r.ev_number}` : ' · no vehicle'}
+                      </Text>
+                    </View>
+                    <Text style={styles.link}>→</Text>
+                  </Pressable>
+                ))}
+                {filteredRiders.length === 0 ? <Text style={styles.hint}>No riders match.</Text> : null}
+              </View>
             </View>
           )}
         </ScrollView>
@@ -138,4 +201,9 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 13 },
   hint: { fontSize: 12, color: colors.textFaint, textAlign: 'center' },
   link: { color: colors.accent, fontSize: 13, fontWeight: '700', textAlign: 'center', paddingVertical: space(1) },
+  riderList: { maxHeight: 380 },
+  riderRow: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingVertical: space(2.5) },
+  riderRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  riderName: { fontSize: 14, fontWeight: '700', color: colors.text },
+  riderMeta: { fontSize: 11.5, color: colors.textMuted },
 });
