@@ -21,7 +21,7 @@ const TIMEOUT_MS = 15000;
 
 async function apiFetch<T>(
   path: string,
-  opts: { method?: 'GET' | 'POST'; body?: unknown; token?: string | null } = {}
+  opts: { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; token?: string | null } = {}
 ): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -52,14 +52,14 @@ async function apiFetch<T>(
 // ---- Auth ----
 
 export function requestOtp(mobile: string) {
-  return apiFetch<{ ok: boolean; channel: string }>('/api/rider-auth/request-otp', {
+  return apiFetch<{ ok: boolean; channel: string; exists?: boolean }>('/api/rider-auth/request-otp', {
     method: 'POST',
     body: { mobile },
   });
 }
 
 export function verifyOtp(mobile: string, otp: string) {
-  return apiFetch<{ ok: boolean; token: string; name: string; tester?: boolean }>('/api/rider-auth/verify', {
+  return apiFetch<{ ok: boolean; token: string; name: string; tester?: boolean; new_rider?: boolean }>('/api/rider-auth/verify', {
     method: 'POST',
     body: { mobile, otp },
   });
@@ -87,9 +87,39 @@ export type RiderMe = {
   name: string;
   rider_code: string | null;
   mobile: string;
+  status: string;
   hub: { name: string; city: string | null } | null;
   vehicle: { ev_number: string; model: string | null; assigned_date: string; allotment_code: string | null } | null;
+  kyc: { submitted: boolean; docs_verified: boolean; vehicle_pref: 'low_speed' | 'high_speed' | null };
 };
+
+export type KycSubmission = {
+  name: string;
+  current_address: string;
+  permanent_address?: string;
+  employer?: string;
+  vehicle_pref: 'low_speed' | 'high_speed';
+  aadhaar: string;
+  pan?: string;
+  dl_number?: string;
+  family_ref_name: string;
+  family_ref_mobile: string;
+  local_ref_name?: string;
+  local_ref_mobile?: string;
+  bank: string;
+  ifsc: string;
+  account_number: string;
+  profile_photo_key?: string;
+  aadhaar_front_key: string;
+  aadhaar_back_key: string;
+  pan_key?: string;
+  dl_front_key?: string;
+  dl_back_key?: string;
+};
+
+export function submitKyc(token: string, body: KycSubmission) {
+  return apiFetch<{ ok: boolean }>('/api/rider/me/kyc', { method: 'PATCH', body, token });
+}
 
 export function getMe(token: string) {
   return apiFetch<RiderMe>('/api/rider/me', { token });
@@ -144,9 +174,10 @@ export function submitPaymentClaim(token: string, body: { amount: number; utr?: 
   });
 }
 
-/** Upload the payment screenshot; returns the S3 key to attach to the claim. */
-export async function uploadScreenshot(token: string, uri: string): Promise<{ key: string }> {
+/** Upload an image (payment proof or KYC doc); returns the S3 key. */
+export async function uploadScreenshot(token: string, uri: string, purpose: 'claims' | 'kyc' = 'claims'): Promise<{ key: string }> {
   const form = new FormData();
+  form.append('purpose', purpose);
   if (uri.startsWith('data:') || uri.startsWith('blob:')) {
     // Web (Expo web preview): picker returns a blob/data URI.
     const blob = await (await fetch(uri)).blob();

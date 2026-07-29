@@ -17,6 +17,7 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [channel, setChannel] = useState<string | null>(null);
+  const [isNewNumber, setIsNewNumber] = useState(false);
   // UAT tester mode: verify(9999999999, 0000) returns a tester token and the
   // rider picker opens; production never issues one.
   const [testerToken, setTesterToken] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export default function LoginScreen() {
     try {
       const res = await requestOtp(mobile);
       setChannel(res.channel);
+      setIsNewNumber(res.exists === false);
       setStep('otp');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not send the code');
@@ -109,7 +111,7 @@ export default function LoginScreen() {
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <Button title="OTP भेजें · Send OTP" onPress={sendOtp} loading={busy} disabled={!mobileOk || busy} />
-              <Text style={styles.hint}>वही नंबर डालें जो MoveGrid में रजिस्टर्ड है</Text>
+              <Text style={styles.hint}>पुराने rider — registered number डालें · नए rider — अपना number डालें, account यहीं बनेगा</Text>
             </View>
           ) : step === 'otp' ? (
             <View style={styles.card}>
@@ -117,6 +119,9 @@ export default function LoginScreen() {
               <Text style={styles.sub}>
                 {channel === 'dev' || channel === 'test' ? 'अपने hub incharge se code lein' : `+91 ${mobile} par bheja gaya`}
               </Text>
+              {isNewNumber ? (
+                <Text style={styles.newBadge}>✨ नया account banega is number se — OTP ke baad KYC poora karein</Text>
+              ) : null}
               <TextInput
                 value={otp}
                 onChangeText={setOtp}
@@ -206,6 +211,7 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 13 },
   hint: { fontSize: 12, color: colors.textFaint, textAlign: 'center' },
   link: { color: colors.accent, fontSize: 13, fontWeight: '700', textAlign: 'center', paddingVertical: space(1) },
+  newBadge: { fontSize: 12, color: colors.accent, fontWeight: '600', lineHeight: 17 },
   riderList: { maxHeight: 440 },
   riderRow: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingVertical: space(2.5) },
   riderRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

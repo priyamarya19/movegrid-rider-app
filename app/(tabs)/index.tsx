@@ -115,14 +115,70 @@ export default function HomeScreen() {
               ) : null}
             </>
           ) : (
-            <Card>
-              <Text style={styles.noVehicle}>अभी कोई गाड़ी allot नहीं है। अपने hub se sampark करें।</Text>
-              {me.data?.hub ? <Text style={styles.hubLine}>Hub: {me.data.hub.name}</Text> : null}
-            </Card>
+            <OnboardingTracker me={me.data} onStartKyc={() => router.push('/kyc')} />
           )}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+// New / vehicle-less rider: the onboarding journey replaces the rent screens.
+// Steps light up from live data — KYC submitted → docs verified (the ops team's
+// KYC-verify buttons) → visit the hub for handover.
+function OnboardingTracker({ me, onStartKyc }: { me: RiderMe | null; onStartKyc: () => void }) {
+  const kyc = me?.kyc;
+  const steps = [
+    { title: 'Account बन गया', sub: me?.rider_code ?? '', state: 'done' as const },
+    {
+      title: 'KYC पूरा करें',
+      sub: kyc?.submitted ? 'Documents jama ho gaye' : 'Naam, pata, documents',
+      state: kyc?.submitted ? ('done' as const) : ('active' as const),
+    },
+    {
+      title: 'Verification',
+      sub: kyc?.docs_verified ? 'Documents verify ho gaye ✓' : kyc?.submitted ? 'Team check kar rahi hai — aam taur par same day' : 'KYC ke baad',
+      state: kyc?.docs_verified ? ('done' as const) : kyc?.submitted ? ('active' as const) : ('todo' as const),
+    },
+    {
+      title: 'Hub par aayein — गाड़ी ready',
+      sub: me?.hub ? `${me.hub.name} hub` : 'Verification ke baad',
+      state: kyc?.docs_verified ? ('active' as const) : ('todo' as const),
+    },
+  ];
+
+  return (
+    <>
+      <Card style={{ gap: space(3) }}>
+        {steps.map((s, i) => (
+          <View key={s.title} style={styles.trackStep}>
+            <View
+              style={[
+                styles.trackDot,
+                s.state === 'done' && { backgroundColor: colors.good },
+                s.state === 'active' && { backgroundColor: colors.accent },
+              ]}>
+              <Text style={styles.trackDotText}>{s.state === 'done' ? '✓' : i + 1}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.trackTitle, s.state === 'todo' && { color: colors.textFaint }]}>{s.title}</Text>
+              {s.sub ? <Text style={styles.trackSub}>{s.sub}</Text> : null}
+            </View>
+          </View>
+        ))}
+      </Card>
+      {!kyc?.submitted ? (
+        <Pressable style={styles.payBtn} onPress={onStartKyc}>
+          <Text style={styles.payBtnText}>KYC शुरू करें · Complete KYC</Text>
+        </Pressable>
+      ) : kyc?.docs_verified && me?.hub ? (
+        <Card style={styles.reviewCard}>
+          <Text style={styles.reviewText}>
+            🎉 Documents verified! {me.hub.name} hub par aakar apni गाड़ी le jaayein. Saath laayein: original Aadhaar.
+          </Text>
+        </Card>
+      ) : null}
+    </>
   );
 }
 
@@ -156,4 +212,12 @@ const styles = StyleSheet.create({
   rowValue: { color: colors.text, fontSize: 13.5, fontWeight: '700' },
   noVehicle: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
   hubLine: { color: colors.text, fontSize: 13, fontWeight: '600', marginTop: space(2) },
+  trackStep: { flexDirection: 'row', gap: space(3), alignItems: 'flex-start' },
+  trackDot: {
+    width: 24, height: 24, borderRadius: radius.full, backgroundColor: colors.border,
+    alignItems: 'center', justifyContent: 'center', marginTop: 1,
+  },
+  trackDotText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  trackTitle: { fontSize: 14.5, fontWeight: '700', color: colors.text },
+  trackSub: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
 });
