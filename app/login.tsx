@@ -83,7 +83,9 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.content, step === 'pick' && styles.contentTop]}
+          keyboardShouldPersistTaps="handled">
           <View style={styles.brand}>
             <Image source={require('@/assets/images/logo-icon.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.brandName}>MoveGrid Rider</Text>
@@ -142,8 +144,9 @@ export default function LoginScreen() {
                 style={styles.input}
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              <View style={styles.riderList}>
-                {filteredRiders.slice(0, 30).map((r, i) => (
+              {/* Own scroll area — a capped plain View clips on Android with no way to reach the rest. */}
+              <ScrollView style={styles.riderList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                {filteredRiders.slice(0, 60).map((r, i) => (
                   <Pressable
                     key={r.id}
                     disabled={busy}
@@ -160,7 +163,7 @@ export default function LoginScreen() {
                   </Pressable>
                 ))}
                 {filteredRiders.length === 0 ? <Text style={styles.hint}>No riders match.</Text> : null}
-              </View>
+              </ScrollView>
             </View>
           )}
         </ScrollView>
@@ -172,6 +175,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { flexGrow: 1, justifyContent: 'center', padding: space(5), gap: space(5) },
+  // Picker step: top-anchored (centering an oversized card breaks scrolling).
+  contentTop: { justifyContent: 'flex-start', paddingTop: space(10) },
   brand: { alignItems: 'center', gap: space(1.5) },
   logo: { width: 56, height: 56 },
   brandName: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
@@ -201,7 +206,7 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 13 },
   hint: { fontSize: 12, color: colors.textFaint, textAlign: 'center' },
   link: { color: colors.accent, fontSize: 13, fontWeight: '700', textAlign: 'center', paddingVertical: space(1) },
-  riderList: { maxHeight: 380 },
+  riderList: { maxHeight: 440 },
   riderRow: { flexDirection: 'row', alignItems: 'center', gap: space(2), paddingVertical: space(2.5) },
   riderRowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   riderName: { fontSize: 14, fontWeight: '700', color: colors.text },
