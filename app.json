@@ -4,6 +4,9 @@
     "slug": "movegrid-rider-app",
     "version": "1.0.0",
     "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/8cd679ce-5953-4988-bc67-753fcfb6994c"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "movegridriderapp",

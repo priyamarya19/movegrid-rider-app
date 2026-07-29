@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
+import { OtaUpdatePrompt } from '@/components/OtaUpdatePrompt';
 import { ToastProvider } from '@/components/ui/Toast';
 import { colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
@@ -54,6 +55,7 @@ export default function RootLayout() {
                 <Stack.Screen name="login" options={{ headerShown: false }} />
               </Stack>
             </AuthGate>
+            <OtaUpdatePrompt />
             <StatusBar style="dark" />
           </ThemeProvider>
         </ToastProvider>
