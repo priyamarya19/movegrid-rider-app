@@ -101,11 +101,11 @@ export default function LoginScreen() {
               <Text style={styles.label}>रजिस्टर्ड मोबाइल नंबर · Mobile number</Text>
               <TextInput
                 value={mobile}
-                onChangeText={setMobile}
-                placeholder="98765 43210"
+                onChangeText={(v) => setMobile(v.replace(/\D/g, '').slice(0, 10))}
+                placeholder="9876543210"
                 placeholderTextColor={colors.textFaint}
                 keyboardType="phone-pad"
-                maxLength={13}
+                maxLength={10}
                 style={styles.input}
                 autoFocus
               />
