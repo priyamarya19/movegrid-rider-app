@@ -117,7 +117,9 @@ export default function LoginScreen() {
             <View style={styles.card}>
               <Text style={styles.label}>OTP डालें</Text>
               <Text style={styles.sub}>
-                {channel === 'dev' || channel === 'test' ? 'अपने hub incharge se code lein' : `+91 ${mobile} par bheja gaya`}
+                {channel === 'dev' || channel === 'test'
+                  ? 'Testing mode: OTP = aapke number ke aakhri 4 digits'
+                  : `+91 ${mobile} par bheja gaya`}
               </Text>
               {isNewNumber ? (
                 <Text style={styles.newBadge}>✨ नया account banega is number se — OTP ke baad KYC poora karein</Text>
