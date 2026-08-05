@@ -3,14 +3,21 @@ import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radius, space } from '@/constants/theme';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { cardShadow, colors, radius, space } from '@/constants/theme';
 import { getTestRiders, requestOtp, testLoginAs, verifyOtp, type TestRider } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useLang } from '@/lib/i18n';
 
-// Two-step login: registered mobile → 6-digit OTP. Hindi-first copy with
-// English inline, matching the rider base.
+// Two-step login: mobile → OTP.
+//
+// The language switch sits at the very top, above the logo: it is the first
+// thing a rider needs if the app opened in the wrong language, and it must be
+// reachable before they've understood anything else on the screen. Both labels
+// always render in their own script for exactly that reason.
 export default function LoginScreen() {
-  const { signIn, signInWithToken, sessionExpired } = useAuth();
+  const { signInWithToken, sessionExpired } = useAuth();
+  const { t } = useLang();
   const [step, setStep] = useState<'mobile' | 'otp' | 'pick'>('mobile');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
@@ -36,7 +43,7 @@ export default function LoginScreen() {
       setIsNewNumber(res.exists === false);
       setStep('otp');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send the code');
+      setError(e instanceof Error ? e.message : t('common.somethingWrong'));
     } finally {
       setBusy(false);
     }
@@ -57,9 +64,9 @@ export default function LoginScreen() {
         return;
       }
       await signInWithToken(res.token, { name: res.name, mobile });
-      // AuthGate redirects to home.
+      // AuthGate redirects to home; home sends new riders on to the city step.
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed');
+      setError(e instanceof Error ? e.message : t('login.invalidOtp'));
       setBusy(false);
     }
   };
@@ -88,17 +95,23 @@ export default function LoginScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, step === 'pick' && styles.contentTop]}
           keyboardShouldPersistTaps="handled">
+          {step !== 'pick' ? (
+            <View style={styles.langRow}>
+              <LanguageToggle />
+            </View>
+          ) : null}
+
           <View style={styles.brand}>
             <Image source={require('@/assets/images/logo-icon.png')} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.brandName}>MoveGrid Rider</Text>
-            <Text style={styles.tag}>आपकी गाड़ी, आपका हिसाब</Text>
+            <Text style={styles.brandName}>MOVEGRID Rider</Text>
+            <Text style={styles.tag}>{t('login.tagline')}</Text>
           </View>
 
-          {sessionExpired ? <Text style={styles.notice}>Session खत्म हो गया — दोबारा लॉगिन करें</Text> : null}
+          {sessionExpired ? <Text style={styles.notice}>{t('login.sessionExpired')}</Text> : null}
 
           {step === 'mobile' ? (
             <View style={styles.card}>
-              <Text style={styles.label}>रजिस्टर्ड मोबाइल नंबर · Mobile number</Text>
+              <Text style={styles.label}>{t('login.mobileLabel')}</Text>
               <TextInput
                 value={mobile}
                 onChangeText={(v) => setMobile(v.replace(/\D/g, '').slice(0, 10))}
@@ -110,19 +123,19 @@ export default function LoginScreen() {
                 autoFocus
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              <Button title="OTP भेजें · Send OTP" onPress={sendOtp} loading={busy} disabled={!mobileOk || busy} />
-              <Text style={styles.hint}>पुराने rider — registered number डालें · नए rider — अपना number डालें, account यहीं बनेगा</Text>
+              <Button title={t('login.sendOtp')} onPress={sendOtp} loading={busy} disabled={!mobileOk || busy} />
+              <Text style={styles.hint}>{t('login.subtitle')}</Text>
             </View>
           ) : step === 'otp' ? (
             <View style={styles.card}>
-              <Text style={styles.label}>OTP डालें</Text>
+              <Text style={styles.label}>{t('login.otpLabel')}</Text>
               <Text style={styles.sub}>
                 {channel === 'dev' || channel === 'test'
-                  ? 'Testing mode: OTP = aapke number ke aakhri 4 digits'
-                  : `+91 ${mobile} par bheja gaya`}
+                  ? 'Testing mode: OTP = last 4 digits of your number'
+                  : t('login.otpSentTo', { mobile: `+91 ${mobile}` })}
               </Text>
               {isNewNumber ? (
-                <Text style={styles.newBadge}>✨ नया account banega is number se — OTP ke baad KYC poora karein</Text>
+                <Text style={styles.newBadge}>{t('login.newAccount')}</Text>
               ) : null}
               <TextInput
                 value={otp}
@@ -135,14 +148,14 @@ export default function LoginScreen() {
                 autoFocus
               />
               {error ? <Text style={styles.error}>{error}</Text> : null}
-              <Button title="लॉगिन करें · Login" onPress={submitOtp} loading={busy} disabled={otp.trim().length < 4 || busy} />
+              <Button title={t('login.verify')} onPress={submitOtp} loading={busy} disabled={otp.trim().length < 4 || busy} />
               <Pressable onPress={() => { setStep('mobile'); setOtp(''); setError(null); }}>
-                <Text style={styles.link}>नंबर बदलें · Change number</Text>
+                <Text style={styles.link}>{t('login.changeNumber')}</Text>
               </Pressable>
             </View>
           ) : (
             <View style={styles.card}>
-              <Text style={styles.label}>🧪 Tester mode — किस rider की app देखनी है?</Text>
+              <Text style={styles.label}>{t('login.testerPick')}</Text>
               <TextInput
                 value={riderSearch}
                 onChangeText={setRiderSearch}
@@ -184,6 +197,7 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', padding: space(5), gap: space(5) },
   // Picker step: top-anchored (centering an oversized card breaks scrolling).
   contentTop: { justifyContent: 'flex-start', paddingTop: space(10) },
+  langRow: { alignItems: 'center' },
   brand: { alignItems: 'center', gap: space(1.5) },
   logo: { width: 56, height: 56 },
   brandName: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
@@ -191,11 +205,10 @@ const styles = StyleSheet.create({
   notice: { textAlign: 'center', color: colors.warning, fontSize: 13, fontWeight: '600' },
   card: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.xl,
+    borderRadius: radius.xxl,
     padding: space(5),
     gap: space(3),
+    ...cardShadow,
   },
   label: { fontSize: 13, fontWeight: '700', color: colors.text },
   sub: { fontSize: 12, color: colors.textMuted, marginTop: -space(1.5) },

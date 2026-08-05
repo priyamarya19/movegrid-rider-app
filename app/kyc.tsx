@@ -5,9 +5,10 @@ import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, StyleSheet } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radius, space } from '@/constants/theme';
+import { cardShadow, colors, radius, space } from '@/constants/theme';
 import { submitKyc, uploadScreenshot } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useLang } from '@/lib/i18n';
 import { clearQueryCache } from '@/lib/queryCache';
 
 // In-app KYC wizard — 3 steps, Hindi-first. PAN + DL become mandatory only when
@@ -17,6 +18,7 @@ type DocKey = 'profile' | 'aadhaarFront' | 'aadhaarBack' | 'pan' | 'dlFront' | '
 
 export default function KycScreen() {
   const { token, user } = useAuth();
+  const { t } = useLang();
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -96,7 +98,7 @@ export default function KycScreen() {
       clearQueryCache(); // home must refetch the new KYC state
       router.replace('/');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submit failed — try again');
+      setError(e instanceof Error ? e.message : t('common.somethingWrong'));
     } finally {
       setBusy(false);
     }
@@ -119,7 +121,7 @@ export default function KycScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'KYC पूरा करें', headerBackTitle: 'Back' }} />
+      <Stack.Screen options={{ title: t('kyc.screenTitle'), headerBackTitle: t('kyc.back') }} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.progress}>
@@ -127,77 +129,77 @@ export default function KycScreen() {
               <View key={s} style={[styles.progressSeg, s <= step && styles.progressOn]} />
             ))}
           </View>
-          <Text style={styles.stepHint}>Step {step} / 3</Text>
+          <Text style={styles.stepHint}>{t('kyc.step', { n: step })}</Text>
 
           {step === 1 ? (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>आपकी जानकारी</Text>
-              <Field label="पूरा नाम · Full name *" value={name} onChange={setName} placeholder="Jaisa Aadhaar par hai" />
-              <Field label="अभी का पता · Current address *" value={currentAddress} onChange={setCurrentAddress} placeholder="Makaan no, gali, area, sheher" multiline />
+              <Text style={styles.sectionTitle}>{t('kyc.s1Title')}</Text>
+              <Field label={t('kyc.name')} value={name} onChange={setName} placeholder={t('kyc.namePlaceholder')} />
+              <Field label={t('kyc.currentAddress')} value={currentAddress} onChange={setCurrentAddress} placeholder={t('kyc.addressPlaceholder')} multiline />
               <Pressable style={styles.checkRow} onPress={() => setSameAddress((v) => !v)}>
                 <FontAwesome name={sameAddress ? 'check-square' : 'square-o'} size={18} color={colors.accent} />
-                <Text style={styles.checkLabel}>Permanent address bhi yahi hai</Text>
+                <Text style={styles.checkLabel}>{t('kyc.sameAddress')}</Text>
               </Pressable>
               {!sameAddress ? (
-                <Field label="स्थायी पता · Permanent address" value={permanentAddress} onChange={setPermanentAddress} placeholder="Gaon / sheher ka pata" multiline />
+                <Field label={t('kyc.permanentAddress')} value={permanentAddress} onChange={setPermanentAddress} placeholder={t('kyc.permanentPlaceholder')} multiline />
               ) : null}
-              <Field label="काम · Work (optional)" value={employer} onChange={setEmployer} placeholder="Zomato / Blinkit / Porter…" />
+              <Field label={t('kyc.work')} value={employer} onChange={setEmployer} placeholder="Zomato / Blinkit / Porter…" />
 
-              <Text style={styles.label}>कौन सी गाड़ी चाहिए? *</Text>
+              <Text style={styles.label}>{t('kyc.whichScooter')}</Text>
               <View style={styles.prefRow}>
                 {(
                   [
-                    { key: 'low_speed', label: 'Low speed', sub: 'DL ki zaroorat nahi' },
-                    { key: 'high_speed', label: 'High speed', sub: 'PAN + DL zaroori' },
+                    { key: 'low_speed', label: t('kyc.lowSpeed'), sub: t('kyc.lowSpeedSub') },
+                    { key: 'high_speed', label: t('kyc.highSpeed'), sub: t('kyc.highSpeedSub') },
                   ] as const
                 ).map((o) => (
                   <Pressable key={o.key} onPress={() => setPref(o.key)} style={[styles.prefBtn, pref === o.key && styles.prefOn]}>
-                    <Text style={[styles.prefLabel, pref === o.key && { color: colors.accent }]}>{o.label}</Text>
+                    <Text style={[styles.prefLabel, pref === o.key && { color: colors.accentText }]}>{o.label}</Text>
                     <Text style={styles.prefSub}>{o.sub}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Button title="आगे बढ़ें · Next" onPress={() => setStep(2)} disabled={!step1Ok} />
+              <Button title={t('kyc.next')} onPress={() => setStep(2)} disabled={!step1Ok} />
             </View>
           ) : step === 2 ? (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Reference और बैंक</Text>
-              <Field label="परिवार से reference — नाम *" value={famName} onChange={setFamName} placeholder="Pita / bhai / rishtedaar" />
-              <Field label="Reference मोबाइल *" value={famMobile} onChange={setFamMobile} placeholder="10-digit number" keyboard="phone-pad" />
-              <Field label="Local reference — नाम (optional)" value={localName} onChange={setLocalName} placeholder="Dost / jaankaar yahan ka" />
-              <Field label="Local reference मोबाइल" value={localMobile} onChange={setLocalMobile} placeholder="10-digit number" keyboard="phone-pad" />
+              <Text style={styles.sectionTitle}>{t('kyc.s2Title')}</Text>
+              <Field label={t('kyc.famName')} value={famName} onChange={setFamName} placeholder={t('kyc.famNamePlaceholder')} />
+              <Field label={t('kyc.famMobile')} value={famMobile} onChange={setFamMobile} placeholder={t('kyc.tenDigits')} keyboard="phone-pad" />
+              <Field label={t('kyc.localName')} value={localName} onChange={setLocalName} placeholder={t('kyc.localNamePlaceholder')} />
+              <Field label={t('kyc.localMobile')} value={localMobile} onChange={setLocalMobile} placeholder={t('kyc.tenDigits')} keyboard="phone-pad" />
               <View style={styles.divider} />
-              <Field label="बैंक का नाम · Bank *" value={bank} onChange={setBank} placeholder="SBI / PNB / …" />
-              <Field label="IFSC code *" value={ifsc} onChange={(v) => setIfsc(v.toUpperCase())} placeholder="SBIN0001234" autoCap="characters" />
-              <Field label="Account number *" value={account} onChange={setAccount} placeholder="Khata number" keyboard="number-pad" />
+              <Field label={t('kyc.bank')} value={bank} onChange={setBank} placeholder="SBI / PNB / …" />
+              <Field label={t('kyc.ifsc')} value={ifsc} onChange={(v) => setIfsc(v.toUpperCase())} placeholder="SBIN0001234" autoCap="characters" />
+              <Field label={t('kyc.account')} value={account} onChange={setAccount} placeholder={t('kyc.accountPlaceholder')} keyboard="number-pad" />
               <View style={styles.navRow}>
-                <Button title="वापस" onPress={() => setStep(1)} variant="danger" />
+                <Button title={t('kyc.back')} onPress={() => setStep(1)} variant="secondary" />
                 <View style={{ flex: 1 }}>
-                  <Button title="आगे बढ़ें · Next" onPress={() => setStep(3)} disabled={!step2Ok} />
+                  <Button title={t('kyc.next')} onPress={() => setStep(3)} disabled={!step2Ok} />
                 </View>
               </View>
             </View>
           ) : (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Documents</Text>
-              <Field label="Aadhaar number *" value={aadhaar} onChange={setAadhaar} placeholder="12 digits" keyboard="number-pad" />
-              <DocPicker dkey="aadhaarFront" label="Aadhaar front photo" required />
-              <DocPicker dkey="aadhaarBack" label="Aadhaar back photo" required />
-              <DocPicker dkey="profile" label="Aapki photo (selfie)" />
+              <Text style={styles.sectionTitle}>{t('kyc.s3Title')}</Text>
+              <Field label={t('kyc.aadhaar')} value={aadhaar} onChange={setAadhaar} placeholder={t('kyc.aadhaarPlaceholder')} keyboard="number-pad" />
+              <DocPicker dkey="aadhaarFront" label={t('kyc.aadhaarFront')} required />
+              <DocPicker dkey="aadhaarBack" label={t('kyc.aadhaarBack')} required />
+              <DocPicker dkey="profile" label={t('kyc.selfie')} />
               <View style={styles.divider} />
               <Text style={styles.subNote}>
-                {high ? 'High-speed gaadi ke liye PAN aur DL zaroori hai:' : 'PAN / DL abhi optional hai (low-speed):'}
+                {high ? t('kyc.docsHigh') : t('kyc.docsLow')}
               </Text>
               <Field label={`PAN number${high ? ' *' : ''}`} value={pan} onChange={(v) => setPan(v.toUpperCase())} placeholder="ABCDE1234F" autoCap="characters" />
-              <DocPicker dkey="pan" label="PAN photo" required={high} />
-              <Field label={`DL number${high ? ' *' : ''}`} value={dlNumber} onChange={(v) => setDlNumber(v.toUpperCase())} placeholder="DL number" autoCap="characters" />
-              <DocPicker dkey="dlFront" label="DL front photo" required={high} />
-              <DocPicker dkey="dlBack" label="DL back photo" />
+              <DocPicker dkey="pan" label={t('kyc.panPhoto')} required={high} />
+              <Field label={`${t('kyc.dlNumber')}${high ? ' *' : ''}`} value={dlNumber} onChange={(v) => setDlNumber(v.toUpperCase())} placeholder={t('kyc.dlNumber')} autoCap="characters" />
+              <DocPicker dkey="dlFront" label={t('kyc.dlFront')} required={high} />
+              <DocPicker dkey="dlBack" label={t('kyc.dlBack')} />
               {error ? <Text style={styles.error}>{error}</Text> : null}
               <View style={styles.navRow}>
-                <Button title="वापस" onPress={() => setStep(2)} variant="danger" />
+                <Button title={t('kyc.back')} onPress={() => setStep(2)} variant="secondary" />
                 <View style={{ flex: 1 }}>
-                  <Button title={busy ? 'Upload ho raha hai…' : 'KYC जमा करें · Submit'} onPress={submit} loading={busy} disabled={!step3Ok || busy} />
+                  <Button title={busy ? t('kyc.uploading') : t('kyc.submit')} onPress={submit} loading={busy} disabled={!step3Ok || busy} />
                 </View>
               </View>
             </View>
@@ -239,8 +241,8 @@ const styles = StyleSheet.create({
   progressOn: { backgroundColor: colors.accent },
   stepHint: { fontSize: 11, color: colors.textFaint, fontWeight: '700' },
   card: {
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.xl, padding: space(4), gap: space(3),
+    backgroundColor: colors.surface, borderRadius: radius.xxl,
+    padding: space(4), gap: space(3), ...cardShadow,
   },
   sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.text },
   label: { fontSize: 12.5, fontWeight: '700', color: colors.text },

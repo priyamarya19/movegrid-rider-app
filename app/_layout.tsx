@@ -9,6 +9,7 @@ import { OtaUpdatePrompt } from '@/components/OtaUpdatePrompt';
 import { ToastProvider } from '@/components/ui/Toast';
 import { colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
+import { LanguageProvider } from '@/lib/i18n';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -46,20 +47,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ToastProvider>
-          <ThemeProvider value={RiderTheme}>
-            <AuthGate>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="login" options={{ headerShown: false }} />
-              </Stack>
-            </AuthGate>
-            <OtaUpdatePrompt />
-            <StatusBar style="dark" />
-          </ThemeProvider>
-        </ToastProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <ThemeProvider value={RiderTheme}>
+              <AuthGate>
+                <Stack>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="login" options={{ headerShown: false }} />
+                  <Stack.Screen name="city" options={{ headerShown: false }} />
+                  <Stack.Screen name="scooters" options={{ headerShown: false }} />
+                </Stack>
+              </AuthGate>
+              <OtaUpdatePrompt />
+              <StatusBar style="dark" />
+            </ThemeProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

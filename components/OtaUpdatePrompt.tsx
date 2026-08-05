@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, View, StyleSheet } from 'react-native';
 
 import { colors, radius, space } from '@/constants/theme';
+import { useLang } from '@/lib/i18n';
 
 // OTA update dialog: on launch, check EAS Update; if a new bundle exists, ask
 // the rider to apply it now (download + reload) or later (Expo applies it on
 // the next cold start automatically). Never shown in dev.
 export function OtaUpdatePrompt() {
   const [state, setState] = useState<'hidden' | 'available' | 'downloading'>('hidden');
+  const { t } = useLang();
 
   useEffect(() => {
     if (__DEV__) return;
@@ -43,22 +45,20 @@ export function OtaUpdatePrompt() {
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.emoji}>🚀</Text>
-          <Text style={styles.title}>नया update आया है</Text>
-          <Text style={styles.sub}>
-            App ka naya version taiyaar hai — behtar features aur fixes ke saath.
-          </Text>
+          <Text style={styles.title}>{t('ota.title')}</Text>
+          <Text style={styles.sub}>{t('ota.body')}</Text>
           {state === 'downloading' ? (
             <View style={styles.downloading}>
               <ActivityIndicator color={colors.accent} />
-              <Text style={styles.downloadingText}>Update ho raha hai… app khud restart hoga</Text>
+              <Text style={styles.downloadingText}>{t('ota.downloading')}</Text>
             </View>
           ) : (
             <>
               <Pressable style={styles.primaryBtn} onPress={applyNow}>
-                <Text style={styles.primaryText}>अभी update करें · Update now</Text>
+                <Text style={styles.primaryText}>{t('ota.now')}</Text>
               </Pressable>
               <Pressable onPress={() => setState('hidden')} hitSlop={8}>
-                <Text style={styles.laterText}>बाद में · Later</Text>
+                <Text style={styles.laterText}>{t('ota.later')}</Text>
               </Pressable>
             </>
           )}

@@ -6,9 +6,10 @@ import { Image, Pressable, ScrollView, Text, TextInput, View, StyleSheet } from 
 
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { colors, radius, space } from '@/constants/theme';
+import { cardShadow, colors, radius, space } from '@/constants/theme';
 import { updateDocuments, uploadScreenshot } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useLang } from '@/lib/i18n';
 import { clearQueryCache } from '@/lib/queryCache';
 
 // Add / replace PAN and DL after KYC — the upgrade path from low-speed to
@@ -17,6 +18,7 @@ export default function DocumentsScreen() {
   const { token } = useAuth();
   const router = useRouter();
   const toast = useToast();
+  const { t } = useLang();
 
   const [pan, setPan] = useState('');
   const [panUri, setPanUri] = useState<string | null>(null);
@@ -52,10 +54,10 @@ export default function DocumentsScreen() {
       }
       await updateDocuments(token, body);
       clearQueryCache();
-      toast('Documents jama ho gaye — team verify karegi', 'success');
+      toast(t('docs.saved'), 'success');
       router.back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submit failed — try again');
+      setError(e instanceof Error ? e.message : t('docs.failed'));
     } finally {
       setBusy(false);
     }
@@ -71,11 +73,9 @@ export default function DocumentsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Documents', headerBackTitle: 'Back' }} />
+      <Stack.Screen options={{ title: t('docs.title'), headerBackTitle: t('kyc.back') }} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.intro}>
-          High-speed गाड़ी ke liye PAN aur DL zaroori hai. Yahan upload karein — team verify karegi, phir aap high-speed le sakte hain. Jo section update nahi karna, use khali chhod dein.
-        </Text>
+        <Text style={styles.intro}>{t('docs.intro')}</Text>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>PAN</Text>
@@ -87,11 +87,11 @@ export default function DocumentsScreen() {
             autoCapitalize="characters"
             style={styles.input}
           />
-          <Doc uri={panUri} onPick={() => pick(setPanUri)} label="PAN card photo" />
+          <Doc uri={panUri} onPick={() => pick(setPanUri)} label={t('docs.panPhoto')} />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Driving Licence</Text>
+          <Text style={styles.sectionTitle}>{t('docs.dlTitle')}</Text>
           <TextInput
             value={dlNumber}
             onChangeText={(v) => setDlNumber(v.toUpperCase())}
@@ -100,13 +100,13 @@ export default function DocumentsScreen() {
             autoCapitalize="characters"
             style={styles.input}
           />
-          <Doc uri={dlFrontUri} onPick={() => pick(setDlFrontUri)} label="DL front photo" />
-          <Doc uri={dlBackUri} onPick={() => pick(setDlBackUri)} label="DL back photo (optional)" />
+          <Doc uri={dlFrontUri} onPick={() => pick(setDlFrontUri)} label={t('docs.dlFront')} />
+          <Doc uri={dlBackUri} onPick={() => pick(setDlBackUri)} label={t('docs.dlBack')} />
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button title={busy ? 'Upload ho raha hai…' : 'Submit karein'} onPress={submit} loading={busy} disabled={!canSubmit} />
-        <Text style={styles.note}>Dono section bharna zaroori nahi — jo add karna hai sirf wahi bharein (number + photo saath mein).</Text>
+        <Button title={busy ? t('docs.uploading') : t('docs.submit')} onPress={submit} loading={busy} disabled={!canSubmit} />
+        <Text style={styles.note}>{t('docs.note')}</Text>
       </ScrollView>
     </>
   );
@@ -117,8 +117,8 @@ const styles = StyleSheet.create({
   content: { padding: space(4), gap: space(3), paddingBottom: space(10) },
   intro: { fontSize: 13, color: colors.textMuted, lineHeight: 19 },
   card: {
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.lg, padding: space(4), gap: space(2.5),
+    backgroundColor: colors.surface, borderRadius: radius.xxl,
+    padding: space(4), gap: space(2.5), ...cardShadow,
   },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
   input: {

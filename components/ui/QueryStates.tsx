@@ -2,6 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { ActivityIndicator, Pressable, Text, View, StyleSheet } from 'react-native';
 
 import { colors, radius, space } from '@/constants/theme';
+import { useLang } from '@/lib/i18n';
 
 export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   return (
@@ -13,13 +14,14 @@ export function LoadingState({ label = 'Loading…' }: { label?: string }) {
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useLang();
   return (
     <View style={styles.center}>
       <FontAwesome name="exclamation-circle" size={28} color={colors.danger} />
       <Text style={styles.errorText}>{message}</Text>
       {onRetry ? (
         <Pressable style={styles.retry} onPress={onRetry} hitSlop={8}>
-          <Text style={styles.retryText}>Try again</Text>
+          <Text style={styles.retryText}>{t('common.retry')}</Text>
         </Pressable>
       ) : null}
     </View>

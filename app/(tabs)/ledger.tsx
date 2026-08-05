@@ -3,21 +3,23 @@ import { FlatList, Pressable, RefreshControl, Text, View, StyleSheet } from 'rea
 
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/QueryStates';
-import { colors, radius, space } from '@/constants/theme';
+import { colors, radius, space, type } from '@/constants/theme';
 import { getMyClaims, getMyRent, type PaymentClaim, type RiderRent } from '@/lib/api';
 import { formatDate, formatINR } from '@/lib/format';
+import { useLang } from '@/lib/i18n';
 import { useApiQuery } from '@/lib/useApiQuery';
 
 // मेरा खाता — every rupee the rider ever paid (Payments) and the week-wise
 // view (Weeks), mirroring the dashboard's rent cycle exactly.
 export default function LedgerScreen() {
-  const fetcher = useCallback((t: string) => getMyRent(t), []);
-  const claimsFetcher = useCallback((t: string) => getMyClaims(t), []);
+  const { t } = useLang();
+  const fetcher = useCallback((tk: string) => getMyRent(tk), []);
+  const claimsFetcher = useCallback((tk: string) => getMyClaims(tk), []);
   const { data, loading, refreshing, error, refetch } = useApiQuery<RiderRent>(fetcher, [], { cacheKey: 'me:rent' });
   const claimsQ = useApiQuery<{ claims: PaymentClaim[] }>(claimsFetcher, [], { cacheKey: 'me:claims' });
   const [tab, setTab] = useState<'payments' | 'weeks'>('payments');
 
-  if (loading) return <LoadingState label="खाता लोड हो रहा है…" />;
+  if (loading) return <LoadingState label={t('ledger.loading')} />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   const payments = data?.payments ?? [];
@@ -32,24 +34,27 @@ export default function LedgerScreen() {
 
   const statusChip = (s: string) =>
     s === 'Collected'
-      ? { label: 'जमा ✓', bg: colors.goodSoft, fg: colors.good }
+      ? { label: t('ledger.statusCollected'), bg: colors.accentSoft, fg: colors.money }
       : s === 'Partial'
-        ? { label: 'आधा जमा', bg: colors.warningSoft, fg: colors.warning }
+        ? { label: t('ledger.statusPartial'), bg: colors.warningSoft, fg: colors.warningText }
         : s === 'Overdue'
-          ? { label: 'बकाया', bg: colors.dangerSoft, fg: colors.danger }
-          : { label: 'बाकी', bg: colors.surfaceAlt, fg: colors.textMuted };
+          ? { label: t('ledger.statusOverdue'), bg: colors.dangerSoft, fg: colors.dangerText }
+          : { label: t('ledger.statusPending'), bg: colors.surfaceAlt, fg: colors.textMuted };
+
+  const tabs = [
+    { key: 'payments' as const, label: t('ledger.tabPayments') },
+    { key: 'weeks' as const, label: t('ledger.tabWeeks') },
+  ];
 
   return (
     <View style={styles.screen}>
       <View style={styles.tabs}>
-        {(
-          [
-            { key: 'payments', label: 'Payments' },
-            { key: 'weeks', label: 'हफ़्ते · Weeks' },
-          ] as const
-        ).map((t) => (
-          <Pressable key={t.key} onPress={() => setTab(t.key)} style={[styles.tabBtn, tab === t.key && styles.tabOn]}>
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextOn]}>{t.label}</Text>
+        {tabs.map((item) => (
+          <Pressable
+            key={item.key}
+            onPress={() => setTab(item.key)}
+            style={[styles.tabBtn, tab === item.key && styles.tabOn]}>
+            <Text style={[styles.tabText, tab === item.key && styles.tabTextOn]}>{item.label}</Text>
           </Pressable>
         ))}
       </View>
@@ -63,7 +68,7 @@ export default function LedgerScreen() {
           ListHeaderComponent={
             <View>
               <Card style={styles.totalCard}>
-                <Text style={styles.totalLabel}>कुल जमा · Total paid</Text>
+                <Text style={styles.totalLabel}>{t('ledger.totalPaid')}</Text>
                 <Text style={styles.totalValue}>{formatINR(Math.round(data?.total_paid ?? 0))}</Text>
               </Card>
               {openClaims.map((c) => (
@@ -78,16 +83,24 @@ export default function LedgerScreen() {
                       <Text style={styles.rejectReason}>❌ {c.reject_reason}</Text>
                     ) : null}
                   </View>
-                  <View style={[styles.chip, { backgroundColor: c.status === 'pending' ? colors.accentSoft : colors.dangerSoft }]}>
-                    <Text style={[styles.chipText, { color: c.status === 'pending' ? colors.accent : colors.danger }]}>
-                      {c.status === 'pending' ? 'Review में' : 'Reject हुआ'}
+                  <View
+                    style={[
+                      styles.chip,
+                      { backgroundColor: c.status === 'pending' ? colors.accentSoft : colors.dangerSoft },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: c.status === 'pending' ? colors.accentText : colors.dangerText },
+                      ]}>
+                      {c.status === 'pending' ? t('ledger.claimReview') : t('ledger.claimRejected')}
                     </Text>
                   </View>
                 </View>
               ))}
             </View>
           }
-          ListEmptyComponent={<EmptyState icon="inbox" message="अभी कोई payment नहीं।" />}
+          ListEmptyComponent={<EmptyState icon="inbox" message={t('ledger.noPayments')} />}
           renderItem={({ item }) => (
             <View style={styles.payRow}>
               <View style={{ flex: 1 }}>
@@ -98,7 +111,10 @@ export default function LedgerScreen() {
                 </Text>
                 {item.period_start && item.period_end ? (
                   <Text style={styles.payPeriod}>
-                    {formatDate(item.period_start)} – {formatDate(item.period_end)} का किराया
+                    {t('ledger.rentFor', {
+                      from: formatDate(item.period_start),
+                      to: formatDate(item.period_end),
+                    })}
                   </Text>
                 ) : null}
               </View>
@@ -112,18 +128,19 @@ export default function LedgerScreen() {
           keyExtractor={(w) => `${w.week_no}-${w.period_start}`}
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetch} tintColor={colors.accent} />}
-          ListEmptyComponent={<EmptyState icon="calendar" message="अभी कोई हफ़्ता नहीं।" />}
+          ListEmptyComponent={<EmptyState icon="calendar" message={t('ledger.noWeeks')} />}
           renderItem={({ item }) => {
             const chip = statusChip(item.status);
             return (
               <View style={styles.payRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.weekTitle}>
-                    Week {item.week_no} · {formatDate(item.period_start)} – {formatDate(item.period_end)}
+                    {t('ledger.week', { n: item.week_no })} · {formatDate(item.period_start)} –{' '}
+                    {formatDate(item.period_end)}
                   </Text>
                   <Text style={styles.payMeta}>
                     {formatINR(Math.round(item.paid))} / {formatINR(Math.round(item.amount))}
-                    {item.due_date ? ` · due ${formatDate(item.due_date)}` : ''}
+                    {item.due_date ? ` · ${t('ledger.due', { date: formatDate(item.due_date) })}` : ''}
                   </Text>
                 </View>
                 <View style={[styles.chip, { backgroundColor: chip.bg }]}>
@@ -144,37 +161,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     margin: space(4),
     marginBottom: space(2),
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    overflow: 'hidden',
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceAlt,
+    padding: 3,
   },
-  tabBtn: { flex: 1, paddingVertical: space(2.5), alignItems: 'center', backgroundColor: colors.surface },
-  tabOn: { backgroundColor: colors.accentSoft },
-  tabText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
-  tabTextOn: { color: colors.accent },
+  tabBtn: { flex: 1, paddingVertical: space(2.5), alignItems: 'center', borderRadius: radius.full },
+  tabOn: { backgroundColor: colors.surface },
+  tabText: { fontSize: type.label, fontWeight: '700', color: colors.textMuted },
+  tabTextOn: { color: colors.text },
   content: { padding: space(4), paddingTop: space(2), paddingBottom: space(10) },
   totalCard: { marginBottom: space(2), alignItems: 'flex-start', gap: 2 },
-  totalLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  totalValue: { fontSize: 24, fontWeight: '800', color: colors.accent },
+  totalLabel: {
+    fontSize: type.overline, fontWeight: '700', color: colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  totalValue: { fontSize: type.screenTitle, fontWeight: '800', color: colors.money },
   payRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space(3),
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: space(3.5),
     marginBottom: space(2),
   },
-  payAmount: { fontSize: 16, fontWeight: '800', color: colors.text },
-  payMeta: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
-  payPeriod: { fontSize: 11.5, color: colors.textFaint, marginTop: 1 },
-  received: { color: colors.good, fontSize: 16, fontWeight: '800' },
-  weekTitle: { fontSize: 13.5, fontWeight: '700', color: colors.text },
-  rejectedRow: { borderColor: 'rgba(192,57,43,0.3)' },
-  rejectReason: { fontSize: 11.5, color: colors.danger, marginTop: 2 },
+  payAmount: { fontSize: type.subtitle, fontWeight: '800', color: colors.text },
+  payMeta: { fontSize: type.caption, color: colors.textMuted, marginTop: 1 },
+  payPeriod: { fontSize: type.overline, color: colors.textFaint, marginTop: 1 },
+  received: { color: colors.money, fontSize: type.subtitle, fontWeight: '800' },
+  weekTitle: { fontSize: type.label, fontWeight: '700', color: colors.text },
+  rejectedRow: { borderWidth: 1, borderColor: 'rgba(220,61,67,0.3)' },
+  rejectReason: { fontSize: type.overline, color: colors.dangerText, marginTop: 2 },
   chip: { borderRadius: radius.full, paddingHorizontal: space(2.5), paddingVertical: space(1) },
-  chipText: { fontSize: 11, fontWeight: '800' },
+  chipText: { fontSize: type.overline, fontWeight: '800' },
 });

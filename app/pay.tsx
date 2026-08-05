@@ -5,10 +5,11 @@ import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View, StyleSheet } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { colors, radius, space } from '@/constants/theme';
+import { cardShadow, colors, radius, space } from '@/constants/theme';
 import { submitPaymentClaim, uploadScreenshot } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatINR } from '@/lib/format';
+import { useLang } from '@/lib/i18n';
 
 // भुगतान करें — the rider pays through ANY UPI app they already use, then
 // submits proof here. The claim goes to the ops verification queue; the ledger
@@ -16,6 +17,7 @@ import { formatINR } from '@/lib/format';
 export default function PayScreen() {
   const { token } = useAuth();
   const router = useRouter();
+  const { t } = useLang();
   const params = useLocalSearchParams<{ amount?: string; dailyRate?: string }>();
 
   const [amount, setAmount] = useState(params.amount ?? '');
@@ -47,7 +49,7 @@ export default function PayScreen() {
       await submitPaymentClaim(token, { amount: amountNum, utr: utr.trim() || null, screenshot_key: key });
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submit failed — try again');
+      setError(e instanceof Error ? e.message : t('pay.submitFailed'));
     } finally {
       setBusy(false);
     }
@@ -56,17 +58,14 @@ export default function PayScreen() {
   if (done) {
     return (
       <>
-        <Stack.Screen options={{ title: 'भुगतान करें' }} />
+        <Stack.Screen options={{ title: t('pay.screenTitle') }} />
         <View style={styles.doneWrap}>
           <View style={styles.doneIcon}>
             <FontAwesome name="check" size={30} color={colors.good} />
           </View>
-          <Text style={styles.doneTitle}>Payment submit ho gaya ✓</Text>
-          <Text style={styles.doneSub}>
-            {formatINR(amountNum)} ka claim review mein hai.{'\n'}Team verify karegi — aam taur par 2 ghante ke andar.
-            Verify hone par aapko खाते mein dikh jayega.
-          </Text>
-          <Button title="ठीक है" onPress={() => router.back()} />
+          <Text style={styles.doneTitle}>{t('pay.doneTitle')}</Text>
+          <Text style={styles.doneSub}>{t('pay.doneSub', { amount: formatINR(amountNum) })}</Text>
+          <Button title={t('pay.ok')} onPress={() => router.back()} />
         </View>
       </>
     );
@@ -74,11 +73,11 @@ export default function PayScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'भुगतान करें' }} />
+      <Stack.Screen options={{ title: t('pay.screenTitle') }} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.card}>
-            <Text style={styles.label}>कितना भुगतान किया? · Amount paid ₹</Text>
+            <Text style={styles.label}>{t('pay.amountLabel')}</Text>
             <TextInput
               value={amount}
               onChangeText={setAmount}
@@ -88,32 +87,32 @@ export default function PayScreen() {
               style={[styles.input, styles.amountInput]}
             />
             {daysPreview > 0 ? (
-              <Text style={styles.hintGood}>≈ {daysPreview} din ka kiraya</Text>
+              <Text style={styles.hintGood}>{t('pay.daysPreview', { days: daysPreview })}</Text>
             ) : null}
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.stepTitle}>1 · Kisi bhi UPI app se pay karein</Text>
-            <Text style={styles.stepSub}>GPay, PhonePe, Paytm — jo bhi aap use karte hain. Apne hub incharge ke number par bhejein.</Text>
+            <Text style={styles.stepTitle}>{t('pay.step1')}</Text>
+            <Text style={styles.stepSub}>{t('pay.step1Sub')}</Text>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.stepTitle}>2 · Screenshot upload karein</Text>
+            <Text style={styles.stepTitle}>{t('pay.step2')}</Text>
             {imageUri ? (
               <Pressable onPress={pickImage}>
                 <Image source={{ uri: imageUri }} style={styles.preview} resizeMode="cover" />
-                <Text style={styles.changePhoto}>बदलें · Change screenshot</Text>
+                <Text style={styles.changePhoto}>{t('pay.changeScreenshot')}</Text>
               </Pressable>
             ) : (
               <Pressable onPress={pickImage} style={styles.upload}>
                 <FontAwesome name="camera" size={18} color={colors.accent} />
-                <Text style={styles.uploadText}>Payment ka screenshot chunein</Text>
+                <Text style={styles.uploadText}>{t('pay.pickScreenshot')}</Text>
               </Pressable>
             )}
             <TextInput
               value={utr}
               onChangeText={setUtr}
-              placeholder="UTR / transaction number (optional)"
+              placeholder={t('pay.utrPlaceholder')}
               placeholderTextColor={colors.textFaint}
               style={styles.input}
               autoCapitalize="characters"
@@ -122,12 +121,12 @@ export default function PayScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button
-            title={busy ? 'Submit ho raha hai…' : 'Submit for verification'}
+            title={busy ? t('pay.submitting') : t('pay.submitForVerification')}
             onPress={submit}
             loading={busy}
             disabled={!canSubmit}
           />
-          <Text style={styles.note}>Team verify karegi, tab tak yeh "review mein" dikhega. Galat screenshot par claim reject ho sakta hai.</Text>
+          <Text style={styles.note}>{t('pay.footnote')}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -139,11 +138,10 @@ const styles = StyleSheet.create({
   content: { padding: space(4), gap: space(3), paddingBottom: space(10) },
   card: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.xxl,
     padding: space(4),
     gap: space(2.5),
+    ...cardShadow,
   },
   label: { fontSize: 13, fontWeight: '700', color: colors.text },
   input: {

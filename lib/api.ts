@@ -21,7 +21,7 @@ const TIMEOUT_MS = 15000;
 
 async function apiFetch<T>(
   path: string,
-  opts: { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; token?: string | null } = {}
+  opts: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown; token?: string | null } = {}
 ): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -89,6 +89,10 @@ export type RiderMe = {
   mobile: string;
   status: string;
   hub: { name: string; city: string | null } | null;
+  /** False until the rider picks a city — the app sends them to the city step. */
+  hub_chosen: boolean;
+  /** Brand chosen in the scooter catalog. Distinct from kyc.vehicle_pref. */
+  preferred_brand: string | null;
   vehicle: { ev_number: string; model: string | null; assigned_date: string; allotment_code: string | null } | null;
   kyc: { submitted: boolean; docs_verified: boolean; vehicle_pref: 'low_speed' | 'high_speed' | null };
   documents: {
@@ -96,6 +100,66 @@ export type RiderMe = {
     dl: { on_file: boolean; verified: boolean };
   };
 };
+
+// ---- City / hub ----
+
+export type CityOption = { hub_id: string; hub_name: string; city: string; area: string | null };
+
+export function getCities(token: string) {
+  return apiFetch<{ cities: CityOption[] }>('/api/rider/cities', { token });
+}
+
+export function setMyCity(token: string, hubId: string) {
+  return apiFetch<{ ok: boolean; hub: { id: string; name: string; city: string } }>('/api/rider/me/city', {
+    method: 'POST',
+    body: { hub_id: hubId },
+    token,
+  });
+}
+
+export type RiderHub = {
+  id: string;
+  name: string;
+  city: string | null;
+  area: string | null;
+  address: string | null;
+  /** null ⇒ hide the directions button; there is nothing to open. */
+  map_link: string | null;
+  contact: { name: string | null; mobile: string | null } | null;
+};
+
+export function getMyHub(token: string) {
+  return apiFetch<{ hub: RiderHub | null }>('/api/rider/me/hub', { token });
+}
+
+// ---- Scooter catalog ----
+
+export type Scooter = {
+  brand: string;
+  daily_min: number;
+  daily_max: number;
+  weekly_min: number;
+  weekly_max: number;
+  high_speed: boolean;
+  image_url: string | null;
+  variants: number;
+};
+
+export function getScooters(token: string) {
+  return apiFetch<{ scooters: Scooter[] }>('/api/rider/scooters', { token });
+}
+
+export function setScooterPreference(token: string, brand: string) {
+  return apiFetch<{ ok: boolean; brand: string }>('/api/rider/me/preference', {
+    method: 'POST',
+    body: { brand },
+    token,
+  });
+}
+
+export function clearScooterPreference(token: string) {
+  return apiFetch<{ ok: boolean }>('/api/rider/me/preference', { method: 'DELETE', token });
+}
 
 /** Add or replace PAN / DL after KYC (each needs number + photo together). */
 export function updateDocuments(
